@@ -562,75 +562,81 @@ elEdgeGlow.style.opacity = String(0.10 + 0.90 * t);}
       }
 
       function spawnBubble() {
-        if (!running) return;
+  if (!running) return;
 
-        removeActiveBubble();
+  removeActiveBubble();
 
-       const rect = elGame.getBoundingClientRect();
-const hudRect = elHud.getBoundingClientRect();
-const tipRect = elTip.getBoundingClientRect();
+  // ✅ 버블 생성(이게 없어서 지금 게임이 멈췄음)
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = '🫧';
 
-let topSafe = (hudRect.bottom - rect.top) + 14;
-let bottomSafe = (rect.bottom - tipRect.top) + 14;
+  const rect = elGame.getBoundingClientRect();
+  const hudRect = elHud.getBoundingClientRect();
+  const tipRect = elTip.getBoundingClientRect();
 
-topSafe = clamp(topSafe, 70, rect.height - 140);
-bottomSafe = clamp(bottomSafe, 70, rect.height - 140);
+  let topSafe = (hudRect.bottom - rect.top) + 14;
+  let bottomSafe = (rect.bottom - tipRect.top) + 14;
 
-const padding = 18;
-const w = 72, h = 72;
+  topSafe = clamp(topSafe, 70, rect.height - 140);
+  bottomSafe = clamp(bottomSafe, 70, rect.height - 140);
 
-let yMin = topSafe;
-let yMax = rect.height - h - bottomSafe;
+  const padding = 18;
+  const w = 72, h = 72;
 
-if (yMax < yMin + 10) {
-  const midTop = rect.height * 0.30;
-  const midBot = rect.height * 0.78;
-  yMin = clamp(midTop, 60, rect.height - h - 60);
-  yMax = clamp(midBot, yMin + 10, rect.height - h - 60);
+  let yMin = topSafe;
+  let yMax = rect.height - h - bottomSafe;
+
+  if (yMax < yMin + 10) {
+    const midTop = rect.height * 0.30;
+    const midBot = rect.height * 0.78;
+    yMin = clamp(midTop, 60, rect.height - h - 60);
+    yMax = clamp(midBot, yMin + 10, rect.height - h - 60);
+  }
+
+  const x = rand(padding, rect.width - w - padding);
+  const y = rand(yMin, yMax);
+
+  bubble.style.left = x + 'px';
+  bubble.style.top = y + 'px';
+
+  // ✅ 클릭/터치 처리
+  bubble.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const r = elGame.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+
+    onHitBubble(px, py);
+  }, { passive: false });
+
+  bubble.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const t = e.changedTouches[0];
+    const r = elGame.getBoundingClientRect();
+    const px = t.clientX - r.left;
+    const py = t.clientY - r.top;
+
+    onHitBubble(px, py);
+  }, { passive: false });
+
+  elGame.appendChild(bubble);
+  activeBubble = bubble;
+
+  const life = bubbleLifeMs;
+  window.setTimeout(() => {
+    if (running && activeBubble === bubble) {
+      removeActiveBubble();
+      onMissBubble();
+    }
+  }, life);
+
+  scheduleNextSpawn();
 }
-
-const x = rand(padding, rect.width - w - padding);
-const y = rand(yMin, yMax);
-
-bubble.style.left = x + 'px';
-bubble.style.top = y + 'px';
-
-        // 터치하기 편하게 화면 가장자리는 조금 여유
-        const padding = 18;
-
-        const w = 68, h = 68;
-        const x = rand(padding, rect.width - w - padding);
-        const y = rand(topSafe, rect.height - h - bottomSafe);
-
-        bubble.style.left = x + 'px';
-        bubble.style.top = y + 'px';
-
-       bubble.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const r = elGame.getBoundingClientRect();
-  const x = e.clientX - r.left;
-  const y = e.clientY - r.top;
-
-  onHitBubble(x, y);
-}, { passive: false });
-
-        elGame.appendChild(bubble);
-        activeBubble = bubble;
-
-        const life = bubbleLifeMs;
-        window.setTimeout(() => {
-          // 버블이 아직 남아있으면 "놓침" 처리
-          if (running && activeBubble === bubble) {
-            removeActiveBubble();
-            onMissBubble();
-          }
-        }, life);
-
-        // 다음 스폰 예약
-        scheduleNextSpawn();
-      }
 
       function scheduleNextSpawn() {
         if (!running) return;
@@ -821,6 +827,7 @@ bindStartButton(elAgainBtn);
   </script>
 </body>
 </html>
+
 
 
 
