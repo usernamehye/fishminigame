@@ -790,13 +790,19 @@ bubble.style.top = y + 'px';
       }
 
       // ====== 버튼/이벤트 ======
-      elStartBtn.addEventListener('click', () => {
-        startGame();
-      });
+      function bindStartButton(btn){
+  const go = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startGame();
+  };
+  btn.addEventListener('click', go);
+  btn.addEventListener('pointerdown', go, { passive: false });
+  btn.addEventListener('touchstart', go, { passive: false });
+}
 
-      elAgainBtn.addEventListener('click', () => {
-        startGame();
-      });
+bindStartButton(elStartBtn);
+bindStartButton(elAgainBtn);
 
       // 게임 화면을 눌러도 스크롤/줌 되지 않게(안전장치)
       elGame.addEventListener('pointerdown', (e) => {
@@ -815,6 +821,7 @@ bubble.style.top = y + 'px';
   </script>
 </body>
 </html>
+
 
 
 
