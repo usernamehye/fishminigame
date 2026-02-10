@@ -656,7 +656,7 @@ elEdgeGlow.style.opacity = String(0.10 + 0.90 * t);}
 
   setDanger(danger - DANGER_DROP_ON_HIT);
 
-  bubbleLifeMs = clamp(BUBBLE_LIFE_START_MS - score * 10, BUBBLE_LIFE_MIN_MS, BUBBLE_LIFE_START_MS);
+  bubbleLifeMs = clamp(BUBBLE_LIFE_START_MS - score * 13, BUBBLE_LIFE_MIN_MS, BUBBLE_LIFE_START_MS);
 
   if (score === 1) setTip('좋아! 거품 타고 앞으로! 🐟');
   else if (score === 6) setTip('상어가 멀어지는 느낌… 계속! ✨');
@@ -830,6 +830,7 @@ bindStartButton(elAgainBtn);
   </script>
 </body>
 </html>
+
 
 
 
