@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>버블 스프린트: 상어 피하기</title>
+  <style>
+    :root {
+      --ui-bg: rgba(255,255,255,0.22);
+      --ui-border: rgba(255,255,255,0.32);
+      --text: rgba(255,255,255,0.95);
+      --muted: rgba(255,255,255,0.75);
+      --shadow: rgba(0,0,0,0.12);
+    }
+#fishWrap{
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+  animation: fishFloat 2.6s ease-in-out infinite;
+}
+
+@keyframes fishFloat{
+  0%   { transform: translate(-50%, -50%) translate(0px, 0px); }
+  50%  { transform: translate(-50%, -50%) translate(8px, -12px); }
+  100% { transform: translate(-50%, -50%) translate(0px, 0px); }
+}
+/* ===== 위험도 테두리 경고(초록→노랑→빨강) ===== */
+#edgeGlow{
+  position:absolute;
+  inset: 10px;
+  border-radius: 22px;
+  pointer-events:none;
+  z-index: 9; /* HUD(10) 아래, 게임 요소 위 느낌 */
+  opacity: 0;
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,0.18) inset,
+    0 0 0 0 rgba(0,0,0,0),
+    0 0 40px 0 rgba(0,0,0,0);
+  transition: opacity 120ms ease;
+}
+
+/* JS가 이 변수를 바꿔서 색/강도를 조절할 거야 */
+#edgeGlow{
+  --edge: rgba(80,255,170,0.0);
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,0.18) inset,
+    0 0 0 6px color-mix(in srgb, var(--edge) 55%, transparent),
+    0 0 50px 10px color-mix(in srgb, var(--edge) 55%, transparent);
+}
+
+/* ===== ✨ 파티클 ===== */
+.spark{
+  position:absolute;
+  left: 0;
+  top: 0;
+  font-size: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events:none;
+  z-index: 12; /* 버블(4)과 HUD(10)보다 위 */
+  will-change: transform, opacity;
+  animation: sparkPop 520ms ease-out forwards;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.12));
+}
+
+@keyframes sparkPop{
+  0%   { opacity: 0; transform: translate(-50%, -50%) translate(0,0) scale(0.6); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) translate(0,0) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1.1); }
+}
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0a7bd8;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 게임 화면: 터치 스크롤/줌 방지 */
+  #game{
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+  overflow: hidden;
+
+  background:
+    radial-gradient(900px 520px at 20% 12%, rgba(255,255,255,0.55), transparent 60%),
+    radial-gradient(820px 520px at 82% 18%, rgba(200,255,245,0.55), transparent 62%),
+    radial-gradient(1200px 900px at 50% 120%, rgba(0,180,160,0.35), transparent 55%),
+    linear-gradient(
+      180deg,
+      #8af2e1 0%,
+      #54e1d4 30%,
+      #2fc7cf 55%,
+      #149fbf 80%,
+      #0a78a8 100%
+    );
+}
+#game::before{
+  content:"";
+  position:absolute;
+  inset:-30%;
+  background:
+    radial-gradient(circle at 25% 22%, rgba(255,255,255,0.40), transparent 35%),
+    radial-gradient(circle at 68% 30%, rgba(255,255,255,0.32), transparent 38%),
+    radial-gradient(circle at 42% 72%, rgba(255,255,255,0.26), transparent 40%);
+  opacity: 0.6;
+  filter: blur(0.6px);
+  animation: shimmer 6.5s ease-in-out infinite;
+  pointer-events:none;
+  z-index:1;
+}
+
+@keyframes shimmer{
+  0%   { transform: translate(-2%, -1%) rotate(0deg); }
+  50%  { transform: translate(2%, 1%) rotate(1.2deg); }
+  100% { transform: translate(-2%, -1%) rotate(0deg); }
+}
+    /* 잔잔한 버블 배경(단순, 가벼움) */
+    .bg-bubble {
+      position: absolute;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      filter: blur(0.3px);
+      opacity: 0.7;
+      pointer-events: none;
+      animation: floatUp linear infinite;
+    }
+    @keyframes floatUp {
+      from { transform: translateY(10vh); }
+      to   { transform: translateY(-120vh); }
+    }
+
+    /* 상단 HUD */
+    #hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      z-index: 10;
+    }
+
+    .card {
+      flex: 1;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 30px var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text);
+      min-width: 0;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+
+    .value {
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* 위험도 게이지 */
+    #dangerWrap {
+      margin-top: 8px;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.22);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    #dangerBar {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(84,255,186,0.95), rgba(255,214,94,0.95), rgba(255,88,88,0.95));
+      transform-origin: left center;
+    }
+
+    /* 가운데 플레이어 물고기(장식) */
+   #fish{
+  width: clamp(80px, 12vw, 130px);
+  height: auto;
+
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,0.18));
+  opacity: 0.95;
+
+  transform-origin: 30% 50%;
+  animation: fishSwim 0.6s ease-in-out infinite;
+}
+
+    /* 클릭 타겟(거품) */
+  .bubble{
+  position:absolute;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  display:grid;
+  place-items:center;
+  font-size: 32px;
+
+  background:
+    radial-gradient(circle at 28% 26%, rgba(255,255,255,0.95), rgba(255,255,255,0.35) 35%, rgba(255,255,255,0.18) 70%),
+    radial-gradient(circle at 70% 74%, rgba(255,255,255,0.28), transparent 55%);
+  border: 2px solid rgba(255,255,255,0.55);
+
+  box-shadow: 0 16px 34px rgba(0,0,0,0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index:4;
+  transform: translateZ(0);
+  transition: transform 90ms ease;
+}
+
+.bubble::after{
+  content:"";
+  position:absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  left: 14px;
+  top: 14px;
+  background: rgba(255,255,255,0.75);
+  filter: blur(0.2px);
+  opacity: 0.9;
+}
+
+.bubble:active{
+  transform: scale(0.96);
+}
+
+    /* 하단 메시지 */
+    #tip {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 10;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 30px var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text);
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    #tipText { color: var(--text); }
+    #startBtn {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.85);
+      color: rgba(0,0,0,0.75);
+      font-weight: 800;
+      cursor: pointer;
+    }
+    #startBtn:active { transform: scale(0.98); }
+
+    /* 상어 등장(위험할 때만) */
+    #shark {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      font-size: clamp(64px, 10vw, 110px);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+      transition: opacity 180ms ease, transform 180ms ease;
+      filter: drop-shadow(0 14px 26px rgba(0,0,0,0.22));
+    }
+    #shark.show {
+      opacity: 0.95;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* 잡혔을 때 오버레이 */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(0,0,0,0.25);
+      z-index: 20;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    #overlay.show { display: grid; }
+
+    #panel {
+      width: min(520px, calc(100vw - 24px));
+      background: rgba(255,255,255,0.22);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 18px;
+      padding: 16px;
+      color: var(--text);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+      text-align: center;
+    }
+    #panel h1 {
+      margin: 8px 0 6px;
+      font-size: 22px;
+    }
+    #panel p {
+      margin: 6px 0;
+      color: rgba(255,255,255,0.88);
+    }
+    #againBtn {
+      margin-top: 12px;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.88);
+      color: rgba(0,0,0,0.75);
+      font-weight: 900;
+      cursor: pointer;
+      width: 100%;
+    }
+    #againBtn:active { transform: scale(0.99); }
+
+    /* 작은 화면에서 HUD 줄바꿈 방지 */
+    @media (max-width: 420px) {
+      #hud { flex-direction: column; }
+      .card { flex: none; }
+    }
+@keyframes fishSwim{
+  0%   { transform: scaleX(-1) rotate(-6deg); }
+  50%  { transform: scaleX(-1) rotate(6deg); }
+  100% { transform: scaleX(-1) rotate(-6deg); }
+}
+    .value, .label {
+  text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+#tipText {
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+  </style>
+</head>
+
+<body>
+  <div id="game" aria-label="게임 화면">
+    <div id="hud">
+      <div class="card">
+        <div class="row">
+          <div class="label">점수</div>
+          <div class="value"><span id="score">0</span> 🫧</div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <div class="label">콤보</div>
+          <div class="value"><span id="combo">0</span> ✨</div>
+        </div>
+      </div>
+<div id="edgeGlow" aria-hidden="true"></div>
+      <div class="card">
+        <div class="row">
+          <div class="label">남은 시간</div>
+          <div class="value"><span id="time">45.0</span>s</div>
+        </div>
+        <div class="label" style="margin-top:8px;">상어 위험도</div>
+        <div id="dangerWrap" aria-label="위험도 게이지">
+          <div id="dangerBar"></div>
+        </div>
+      </div>
+    </div>
+ <div id="fishWrap" aria-hidden="true">
+  <img id="fish" src="clownfish.png" alt="물고기" />
+</div>
+    <div id="shark" aria-hidden="true">🦈</div>
+
+    <div id="tip">
+      <div id="tipText">🫧 거품을 빨리 눌러서 상어를 따돌리자! (터치/클릭)</div>
+      <button id="startBtn" type="button">시작</button>
+    </div>
+
+    <div id="overlay">
+      <div id="panel">
+        <div style="font-size:56px; margin-top: 2px;">🦈</div>
+        <h1 id="resultTitle">잡혔다!</h1>
+        <p id="resultLine">점수 0, 최고 콤보 0</p>
+        <p id="resultBadge">칭호: </p>
+        <button id="againBtn" type="button">다시 하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const elGame = document.getElementById('game');
+      const elScore = document.getElementById('score');
+      const elCombo = document.getElementById('combo');
+      const elTime = document.getElementById('time');
+      const elDangerBar = document.getElementById('dangerBar');
+      const elShark = document.getElementById('shark');
+      const elOverlay = document.getElementById('overlay');
+      const elStartBtn = document.getElementById('startBtn');
+      const elAgainBtn = document.getElementById('againBtn');
+      const elTipText = document.getElementById('tipText');
+      const elResultTitle = document.getElementById('resultTitle');
+      const elResultLine = document.getElementById('resultLine');
+      const elResultBadge = document.getElementById('resultBadge');
+      const elEdgeGlow = document.getElementById('edgeGlow');
+      const elHud = document.getElementById('hud');
+      const elTip = document.getElementById('tip');
+function burstSparks(x, y) {
+  const count = 10;
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement('span');
+    s.className = 'spark';
+    s.textContent = '✨';
+
+    // 랜덤 방향/거리
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 26 + Math.random() * 34;
+    const dx = Math.cos(ang) * dist;
+    const dy = Math.sin(ang) * dist;
+
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.setProperty('--dx', dx.toFixed(1) + 'px');
+    s.style.setProperty('--dy', dy.toFixed(1) + 'px');
+
+    elGame.appendChild(s);
+    s.addEventListener('animationend', () => s.remove());
+  }
+}
+      // ====== 게임 설정값 ======
+      const ROUND_SECONDS = 40.0;
+
+      // 버블 생성 템포(랜덤 범위)
+      const SPAWN_MIN_MS = 520;
+      const SPAWN_MAX_MS = 980;
+
+      // 버블이 화면에 남는 시간(점점 짧아짐)
+      const BUBBLE_LIFE_START_MS = 760;
+      const BUBBLE_LIFE_MIN_MS   = 460;
+
+      // 위험도 시스템
+      // - 시간이 흐를수록 위험도 상승(상어가 다가옴)
+      // - 버블 클릭하면 위험도 감소(도망 성공)
+      const DANGER_RISE_PER_SEC = 12.0;   // 초당 상승
+      const DANGER_DROP_ON_HIT  = 11.0;   // 클릭 시 감소
+      const DANGER_PENALTY_MISS = 9.5;    // 버블 놓치면(사라짐) 추가 상승
+
+      const SHARK_SHOW_AT = 85;           // 85% 이상이면 상어 아이콘 등장
+      const CAUGHT_AT = 100;              // 100%면 잡힘(게임오버)
+
+      // ====== 상태 ======
+      let running = false;
+      let score = 0;
+      let combo = 0;
+      let bestCombo = 0;
+      let danger = 0;           // 0~100
+      let timeLeft = ROUND_SECONDS;
+      let spawnTimer = null;
+      let tickRAF = 0;
+      let lastTick = 0;
+      let activeBubble = null;
+      let bubbleLifeMs = BUBBLE_LIFE_START_MS;
+
+      // ====== 유틸 ======
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+      function rand(min, max) { return Math.random() * (max - min) + min; }
+
+      function setDanger(next) {
+        danger = clamp(next, 0, 110);
+        const pct = clamp(danger, 0, 100);
+        elDangerBar.style.width = pct + '%';
+
+        if (pct >= SHARK_SHOW_AT && pct < CAUGHT_AT && running) {
+          elShark.classList.add('show');
+        } else {
+          elShark.classList.remove('show');
+        }
+      // ===== 테두리 경고 업데이트 =====
+const pct2 = clamp(danger, 0, 100);
+
+// 0~70은 거의 표시 안 함, 70~100에서 점점 강해짐
+const t = clamp((pct2 - 70) / 30, 0, 1);
+
+// 색상: 초록(120) → 노랑(55) → 빨강(0)
+let hue;
+if (pct2 < 85) {
+  const k = clamp((pct2 - 70) / 15, 0, 1);     // 70~85
+  hue = 120 + (55 - 120) * k;                  // 120→55
+} else {
+  const k = clamp((pct2 - 85) / 15, 0, 1);     // 85~100
+  hue = 55 + (0 - 55) * k;                     // 55→0
+}
+
+// 테두리 색/투명도
+const alpha = 0.20 + 0.55 * t;
+elEdgeGlow.style.setProperty('--edge', `hsla(${hue}, 95%, 58%, ${alpha})`);
+elEdgeGlow.style.opacity = String(0.10 + 0.90 * t);}
+
+      function updateHUD() {
+        elScore.textContent = String(score);
+        elCombo.textContent = String(combo);
+        elTime.textContent = timeLeft.toFixed(1);
+      }
+
+      function setTip(text) {
+        elTipText.textContent = text;
+      }
+
+      // ====== 배경 버블(가벼운 장식) ======
+      function makeBgBubbles() {
+        // 너무 많이 만들면 부담될 수 있어서 적당히
+        const count = 14;
+        for (let i = 0; i < count; i++) {
+          const b = document.createElement('div');
+          b.className = 'bg-bubble';
+          const size = rand(14, 44);
+          b.style.width = size + 'px';
+          b.style.height = size + 'px';
+          b.style.left = rand(0, 100) + 'vw';
+          b.style.top = rand(0, 120) + 'vh';
+          b.style.animationDuration = rand(6, 14) + 's';
+          b.style.opacity = rand(0.35, 0.75);
+          elGame.appendChild(b);
+        }
+      }
+
+      // ====== 버블 생성/삭제 ======
+      function removeActiveBubble() {
+        if (!activeBubble) return;
+        activeBubble.remove();
+        activeBubble = null;
+      }
+
+      function spawnBubble() {
+        if (!running) return;
+
+        removeActiveBubble();
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = '🫧';
+
+        const rect = elGame.getBoundingClientRect();
+
+        // HUD/하단바 공간을 피해서 생성(대충 안전 영역)
+        const rect = elGame.getBoundingClientRect();
+const hudRect = elHud.getBoundingClientRect();
+const tipRect = elTip.getBoundingClientRect();
+
+// 실제 HUD 아래부터 생성, 실제 TIP 위까지만 생성
+const topSafe = (hudRect.bottom - rect.top) + 14;      // HUD 아래 여백
+const bottomSafe = (rect.bottom - tipRect.top) + 14;   // TIP 위 여백
+
+// 터치하기 편하게 화면 가장자리는 조금 여유
+const padding = 18;
+
+const w = 72, h = 72; // 너 bubble CSS가 72px라서 맞춤
+const x = rand(padding, rect.width - w - padding);
+const y = rand(topSafe, rect.height - h - bottomSafe);
+
+bubble.style.left = x + 'px';
+bubble.style.top = y + 'px';
+
+        // 터치하기 편하게 화면 가장자리는 조금 여유
+        const padding = 18;
+
+        const w = 68, h = 68;
+        const x = rand(padding, rect.width - w - padding);
+        const y = rand(topSafe, rect.height - h - bottomSafe);
+
+        bubble.style.left = x + 'px';
+        bubble.style.top = y + 'px';
+
+       bubble.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const r = elGame.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+
+  onHitBubble(x, y);
+}, { passive: false });
+
+        elGame.appendChild(bubble);
+        activeBubble = bubble;
+
+        const life = bubbleLifeMs;
+        window.setTimeout(() => {
+          // 버블이 아직 남아있으면 "놓침" 처리
+          if (running && activeBubble === bubble) {
+            removeActiveBubble();
+            onMissBubble();
+          }
+        }, life);
+
+        // 다음 스폰 예약
+        scheduleNextSpawn();
+      }
+
+      function scheduleNextSpawn() {
+        if (!running) return;
+        if (spawnTimer) window.clearTimeout(spawnTimer);
+        const wait = rand(SPAWN_MIN_MS, SPAWN_MAX_MS);
+        spawnTimer = window.setTimeout(spawnBubble, wait);
+      }
+
+      function onHitBubble(x, y) {
+  if (!running) return;
+
+  burstSparks(x, y); // ✅ 성공 시 ✨ 파티클
+
+  score += 1;
+  combo += 1;
+  bestCombo = Math.max(bestCombo, combo);
+
+  setDanger(danger - DANGER_DROP_ON_HIT);
+
+  bubbleLifeMs = clamp(BUBBLE_LIFE_START_MS - score * 8, BUBBLE_LIFE_MIN_MS, BUBBLE_LIFE_START_MS);
+
+  if (score === 1) setTip('좋아! 거품 타고 앞으로! 🐟');
+  else if (score === 6) setTip('상어가 멀어지는 느낌… 계속! ✨');
+  else if (score === 12) setTip('오늘은 바다가 진짜 맑다! 🌊');
+  else if (score === 20) setTip('너, 바다 최강 러너 아니야? 😄');
+
+  removeActiveBubble();
+  updateHUD();
+}
+
+      function onMissBubble() {
+        if (!running) return;
+
+        combo = 0;
+        setDanger(danger + DANGER_PENALTY_MISS);
+
+        // 놓치면 안내는 밝게, 부담 없이
+        const lines = [
+          '괜찮아! 다음 거품 잡자 🫧',
+          '손끝이 미끄러졌네! 다시! 😄',
+          '상어가 조금 가까워졌어… 빨리! 🦈'
+        ];
+        setTip(lines[Math.floor(Math.random() * lines.length)]);
+
+        updateHUD();
+      }
+
+      // ====== 게임 루프 ======
+      function tick(ts) {
+        if (!running) return;
+        if (!lastTick) lastTick = ts;
+
+        const dt = (ts - lastTick) / 1000;
+        lastTick = ts;
+
+        // 시간 감소
+        timeLeft = Math.max(0, timeLeft - dt);
+
+        // 위험도는 시간에 따라 상승(상어가 다가옴)
+        setDanger(danger + DANGER_RISE_PER_SEC * dt);
+
+        // 거의 잡힐 때는 상어 경고 문구(너무 자주 바뀌지 않게 조건부)
+        const pct = clamp(danger, 0, 100);
+        if (pct >= SHARK_SHOW_AT && pct < CAUGHT_AT) {
+          setTip('상어가 코앞! 거품을 더 빠르게! 🫧🦈');
+        }
+
+        updateHUD();
+
+        // 종료 조건
+        if (danger >= CAUGHT_AT) {
+          endGame(false); // 잡힘
+          return;
+        }
+        if (timeLeft <= 0) {
+          endGame(true); // 시간 버팀(성공)
+          return;
+        }
+
+        tickRAF = requestAnimationFrame(tick);
+      }
+
+      // ====== 시작/종료 ======
+      function resetState() {
+        running = false;
+        score = 0;
+        combo = 0;
+        bestCombo = 0;
+        danger = 0;
+        timeLeft = ROUND_SECONDS;
+        bubbleLifeMs = BUBBLE_LIFE_START_MS;
+
+        if (spawnTimer) window.clearTimeout(spawnTimer);
+        spawnTimer = null;
+
+        if (tickRAF) cancelAnimationFrame(tickRAF);
+        tickRAF = 0;
+        lastTick = 0;
+
+        removeActiveBubble();
+        setDanger(0);
+        updateHUD();
+      }
+
+      function startGame() {
+        resetState();
+        elOverlay.classList.remove('show');
+        elShark.classList.remove('show');
+
+        running = true;
+        setTip('시작! 거품을 눌러서 도망치자 🫧');
+        updateHUD();
+
+        scheduleNextSpawn();
+        tickRAF = requestAnimationFrame(tick);
+      }
+
+      function badgeFor(scoreValue, survived) {
+        // 밝은 톤의 칭호들
+        if (!survived) {
+          if (scoreValue <= 5) return '칭호: 바다 입문 물고기 🐟';
+          if (scoreValue <= 12) return '칭호: 거품 러너 🫧';
+          if (scoreValue <= 25) return '칭호: 상어 아슬아슬 회피자 😅';
+          return '칭호: 거의 프로(하지만 상어가 더 집요했음) 🦈';
+        } else {
+          if (scoreValue <= 8) return '칭호: 무사 귀환! 🌈';
+          if (scoreValue <= 16) return '칭호: 파도 스프린터 🌊';
+          if (scoreValue <= 30) return '칭호: 상어 따돌리기 장인 ✨';
+          return '칭호: 바다의 전설 🏆🐟';
+        }
+      }
+
+      function endGame(survived) {
+        running = false;
+
+        if (spawnTimer) window.clearTimeout(spawnTimer);
+        spawnTimer = null;
+        if (tickRAF) cancelAnimationFrame(tickRAF);
+        tickRAF = 0;
+
+        removeActiveBubble();
+
+        // 잡힐 때는 상어를 확실히 보여주기
+        if (!survived) {
+          elShark.classList.add('show');
+          elResultTitle.textContent = '잡혔다! 🦈';
+        } else {
+          elShark.classList.remove('show');
+          elResultTitle.textContent = '탈출 성공! 🐟✨';
+        }
+
+        elResultLine.textContent = `점수 ${score}, 최고 콤보 ${bestCombo}`;
+        elResultBadge.textContent = badgeFor(score, survived);
+        elOverlay.classList.add('show');
+
+        setTip('다시 하려면 “다시 하기”를 눌러줘!');
+      }
+
+      // ====== 버튼/이벤트 ======
+      elStartBtn.addEventListener('click', () => {
+        startGame();
+      });
+
+      elAgainBtn.addEventListener('click', () => {
+        startGame();
+      });
+
+      // 게임 화면을 눌러도 스크롤/줌 되지 않게(안전장치)
+      elGame.addEventListener('pointerdown', (e) => {
+        if (!running) return;
+        // 버블이 아닌 곳을 누르면 콤보는 끊지 않고, 그냥 “헛클릭” 느낌만(너무 벌 주지 않게)
+        // 대신 위험도가 살짝 오르도록 하고 싶으면 아래 주석을 풀어도 됨.
+        // setDanger(danger + 1.2);
+        e.preventDefault();
+      }, { passive: false });
+
+      // ====== 초기 세팅 ======
+      makeBgBubbles();
+      resetState();
+      setTip('🫧 거품을 빨리 눌러서 상어를 따돌리자! (터치/클릭)');
+    })();
+  </script>
+</body>
+</html>
+
+
+
