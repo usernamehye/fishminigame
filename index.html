@@ -388,7 +388,7 @@
       <div class="card">
         <div class="row">
           <div class="label">남은 시간</div>
-          <div class="value"><span id="time">45.0</span>s</div>
+          <div class="value"><span id="time">40.0</span>s</div>
         </div>
         <div class="label" style="margin-top:8px;">상어 위험도</div>
         <div id="dangerWrap" aria-label="위험도 게이지">
@@ -566,27 +566,31 @@ elEdgeGlow.style.opacity = String(0.10 + 0.90 * t);}
 
         removeActiveBubble();
 
-        const bubble = document.createElement('div');
-        bubble.className = 'bubble';
-        bubble.textContent = '🫧';
-
-        const rect = elGame.getBoundingClientRect();
-
-        // HUD/하단바 공간을 피해서 생성(대충 안전 영역)
-        const rect = elGame.getBoundingClientRect();
+       const rect = elGame.getBoundingClientRect();
 const hudRect = elHud.getBoundingClientRect();
 const tipRect = elTip.getBoundingClientRect();
 
-// 실제 HUD 아래부터 생성, 실제 TIP 위까지만 생성
-const topSafe = (hudRect.bottom - rect.top) + 14;      // HUD 아래 여백
-const bottomSafe = (rect.bottom - tipRect.top) + 14;   // TIP 위 여백
+let topSafe = (hudRect.bottom - rect.top) + 14;
+let bottomSafe = (rect.bottom - tipRect.top) + 14;
 
-// 터치하기 편하게 화면 가장자리는 조금 여유
+topSafe = clamp(topSafe, 70, rect.height - 140);
+bottomSafe = clamp(bottomSafe, 70, rect.height - 140);
+
 const padding = 18;
+const w = 72, h = 72;
 
-const w = 72, h = 72; // 너 bubble CSS가 72px라서 맞춤
+let yMin = topSafe;
+let yMax = rect.height - h - bottomSafe;
+
+if (yMax < yMin + 10) {
+  const midTop = rect.height * 0.30;
+  const midBot = rect.height * 0.78;
+  yMin = clamp(midTop, 60, rect.height - h - 60);
+  yMax = clamp(midBot, yMin + 10, rect.height - h - 60);
+}
+
 const x = rand(padding, rect.width - w - padding);
-const y = rand(topSafe, rect.height - h - bottomSafe);
+const y = rand(yMin, yMax);
 
 bubble.style.left = x + 'px';
 bubble.style.top = y + 'px';
@@ -811,6 +815,7 @@ bubble.style.top = y + 'px';
   </script>
 </body>
 </html>
+
 
 
 
